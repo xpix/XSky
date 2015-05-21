@@ -14,14 +14,15 @@ my $SPort = shift || '/dev/ttyAMA0';
 my $DEBUG = 1;
 my $gps   = GPS::NMEA->new(Port => $SPort, Baud => 9600);
 my $CallSign = 'DH6IAG';
-my $WavPath  = 'audio/aprs.wav';
-my $interval = ($DEBUG ? 10 : 300);
+my $WavPath  = '/run/shm/aprs.wav';
+my $interval = 300; # intervall in seconds
 my $aprs_bin = '/usr/local/bin/aprs';
 my $aplay    = '/usr/bin/aplay';
 my $amixer   = '/usr/bin/amixer';
+my $ping     = '/bin/ping';
 
 # ------------- Set Audio Output ------------
-Device::BCM2835::set_debug(1);
+# Device::BCM2835::set_debug(1);
 Device::BCM2835::init();
 Device::BCM2835::gpio_fsel(&Device::BCM2835::RPI_V2_GPIO_P1_12, &Device::BCM2835::BCM2835_GPIO_FSEL_ALT5);
 Device::BCM2835::gpio_fsel(&Device::BCM2835::RPI_V2_GPIO_P1_16, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);    
@@ -30,16 +31,14 @@ Device::BCM2835::gpio_fsel(&Device::BCM2835::RPI_V2_GPIO_P1_16, &Device::BCM2835
 Mojo::IOLoop->recurring($interval => sub {
    my $self = shift;
 
-   # call fast in debug mode and after that sleep 5 min
-   $interval = 300 if($interval == 10);
-
    # Get GPS Position
-   my($ns,$lat,$ew,$lon) = $gps->get_position;
-   warn "($ns, $lat, $ew, $lon)\n" if $DEBUG;
+   my($ns,$lat,$ew,$lon,$alt) = ($gps->get_position, $gps->{NMEADATA}->{alt_meters} || 0);
+   warn scalar localtime." GPS: $ns, $lat, $ew, $lon, $alt\n" 
+      if $DEBUG;
 
    # Check if altitude change, if not then the balloon has landed and 
    # we switch the wlan on for next 5 minutes then switch off for 5 min
-   my $wlanState = app->checkWlan( $gps->altitude );
+   # my $wlanState = app->checkWlan( $alt );
 
    # Get Temperatures and other Data
    my $sensors = app->getSensorData();
@@ -94,13 +93,13 @@ helper aprs_send => sub {
    # switch RF ON via GPIO
    Device::BCM2835::gpio_write(&Device::BCM2835::RPI_V2_GPIO_P1_16, 0);
    # wait a half second
-   Device::BCM2835::delay(500); # Milliseconds
+   Device::BCM2835::delay(200); # Milliseconds
 
    app->sys($amixer, '-d set PCM -- 200');
    app->sys($aplay, $wavefile);
 
    # wait a half second
-   Device::BCM2835::delay(500); # Milliseconds
+   Device::BCM2835::delay(200); # Milliseconds
    # switch RF OFF via GPIO
    Device::BCM2835::gpio_write(&Device::BCM2835::RPI_V2_GPIO_P1_16, 1);
 
@@ -110,28 +109,41 @@ helper aprs_send => sub {
 };
 
 # Check if altitude change, if not then the balloon has landed and 
-# we switch the wlan on for next 5 minutes then switch off for 5 min
+# we try to connect to an Access Point (Laptop, RPI)
+# http://unix.stackexchange.com/questions/12005/how-to-use-linux-kernel-driver-bind-unbind-interface-for-usb-hid-devices
+# http://raspberrypi.stackexchange.com/questions/6782/commands-to-simulate-removing-and-re-inserting-a-usb-peripheral
+# sudo sh -c 'echo 1-1 > /sys/bus/usb/drivers/usb/unbind'
+# sudo sh -c 'echo 1-1 > /sys/bus/usb/drivers/usb/bind'
 helper checkWlan => sub {
    my $self    = shift;
    my $alt     = shift || return;
 
    # Init wlanState and old altitude
-   $self->{wlan_state) = 0 if(not exists $self->{wlan_state));
-   $self->{old_alt) = 0    if(not exists $self->{old_alt));
+   $self->{wlan_state} = 0 if(not exists $self->{wlan_state});
+   $self->{old_alt} = 0    if(not exists $self->{old_alt});
 
-   # Altitude changed?
-   if($self->{old_alt) == $alt){
-      if($self->{wlan_state)){
-         # switch wlan off
-         $self->{wlan_state) = 0;
-      } else {
-         # switch wlan on
-         $self->{wlan_state) = 1;
+   # Altitude not changed?
+   if($self->{old_alt} == $alt){
+      # ping => ok ... return
+      if(app->sys($ping, '-c 1 www.google.de')){
+         return 1;
       }
+      else {
+         # Switch USB WLAN ON
+         # Try to connect to an Access Point
+         # wait a minute 
+         # ping
+         # fail => wlan off
+      }
+   }
+   else {
+      # Changed Altitude
+      # check if USB WLAN off
+      # if not switch USB Wlan off
    }
 
    $self->{old_alt} = $alt;
-   return $self->{wlan_state);
+   return $self->{wlan_state};
 };
 
 # Call system command
