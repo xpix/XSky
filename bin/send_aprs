@@ -1,0 +1,30 @@
+#!/bin/bash
+
+WAVEFILE=$1
+if [ -e "$WAVEFILE" ]
+  then
+    echo "No path to wav file supplied"
+fi
+
+cd ~/XSky
+echo Redirect audio to GPIO ...
+sudo nice ./bin/pwm_switch
+echo Set volume
+nice amixer set PCM -- 100
+
+echo Set PTT ...
+
+# Set GPIO Pin 4 to PushToTalk pin
+gpio mode 4 output
+
+echo Testing for file
+if [ -e $WAVEFILE ]
+then
+	echo Found file ...
+	gpio write 4 0
+	sleep 0.2
+	nice aplay $WAVEFILE
+	sleep 0.2
+	gpio write 4 1
+fi
+sleep 1

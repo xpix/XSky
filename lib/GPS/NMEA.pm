@@ -46,7 +46,6 @@ sub parse_line {
 
     #remove trailing chars
     chomp($line);$line =~ s/\r//g;
-
     #Test checksum
     if ($line =~  s/\*(\w\w)$//) {
 	$csum = $1;
