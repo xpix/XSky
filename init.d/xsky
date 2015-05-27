@@ -15,11 +15,17 @@ case "$1" in
 
 start)
         cd /home/pi/XSky
+        CFGFILE="./cfg/xsky.cfg"
+        [ -f ./cfg/.xsky.cfg ] && CFGFILE="./cfg/.xsky.cfg"
+        echo "Use cfgfile $CFGFILE .."
         echo "Starting xsky tracker prg .."
-        sudo -u pi screen -dmS xskyMain ./xsky.pl
+        sudo -u pi screen -dmS xskyMain ./xsky.pl "$CFGFILE"
+
+        echo "Starting xsky webservice .."
+        sudo -u pi screen -dmS xskyHttpd ./xsky_httpd.pl "$CFGFILE"
 
         echo "Starting xsky camera record .."
-        cd /home/pi/XSky/video
+        sudo -u pi mkdir -p /home/pi/XSky/video
         count=`ls -1 /home/pi/XSky/video/*.h264 | wc -l`
         count=`expr $count + 1`
         sudo -u pi screen -dmS xskyVideo raspivid --verbose --start "$count" --timeout 28800000 --timed 300000,300000 -fps 10 -w 1296 -h 730 --bitrate 1000000 --output /home/pi/XSky/video/video_%04d.h264 --segment 1200000 --nopreview
@@ -28,6 +34,9 @@ start)
 stop)
         echo "Stopping xskyMain .."
         sudo -u pi screen -S xskyMain -X quit
+
+        echo "Stopping xskyHttpd .."
+        sudo -u pi screen -S xskyHttpd -X quit
 
         echo "Stopping xskyVideo .."
         sudo -u pi screen -S xskyVideo -X quit

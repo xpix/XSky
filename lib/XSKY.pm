@@ -1,50 +1,52 @@
 package XSKY;
 # ------------- XSKY Module -------------------
 
+use strict;
+use warnings;
+
 # ------------- MODULES  ----------------
 use JSON::XS qw(decode_json);
 
 # ------------- GLOBAL VARS ----------------
-my $SPort    = shift || '/dev/ttyAMA0';
-my $CallSign = shift || 'DH6IAG';
-my $WavPath  = '/run/shm/aprs.wav';
 my $aprs_bin = '/usr/local/bin/aprs';
 my $aplay    = '~/XSky/bin/send_aprs';
 my $ping     = '/bin/ping';
 my $nice     = '/usr/bin/nice';
 my $gpscmd   = '/usr/bin/gpspipe -w -n 10 | grep --color=never TPV | head -1';
-my $DEBUG    = 1;
 my $GPS      = {};
+my $DEBUG    = 0;
 
 sub new {
    my $class = shift;
    my $self = {};
    bless $self, $class;
 
-   unlink($WavPath);
+   $self->{cfg} = $self->getconfig(shift);
 
+   $DEBUG = $self->cfg('DEBUG');
+   
    return $self;
+}
+
+sub cfg { 
+   my $self = shift; 
+   my $name = shift or return $self->{cfg};
+   return $self->{cfg}->{$name} 
+      or die "Unable to find config entry: $name"; 
+}
+
+sub data { 
+   my $self = shift; 
+   return { 
+      gps => $self->getGPS(),
+   };
 }
   
 sub interval {
    my $self = shift;
    my $good = 0;
 
-   # Get GPS Position from running gpsd
-   my $i = 0;
-   while($i++ < 5){
-      $GPS = eval{ decode_json( $self->sys($gpscmd)) };
-      warn $@ && next if($@);
-      $GPS->{lat_NS} = 'N';
-      $GPS->{lon_EW} = 'E';
-                  
-      warn scalar localtime.sprintf(" GPS: %s, %s, %s, %s, %s\n",
-         $GPS->{lat_NS}, $GPS->{lat}, $GPS->{lon_EW}, $GPS->{lon}, $GPS->{alt} )
-            if $DEBUG;
-
-      last if($GPS->{lat} and $GPS->{alt});
-   }
-
+   $GPS = $self->getGPS();
 
    if(not $GPS->{lat}){
       if($self->{gpsfail}++ >= 2){
@@ -68,6 +70,7 @@ sub interval {
    my $aprs = $self->aprs_build($sensors);
    warn "Build Aprs: '$aprs'\n" if $DEBUG;
 
+   my $WavPath = $self->cfg('WavPath');
    if(not -s $WavPath){
       # Create aprs wav audio file
       my $wavefile = $self->aprs_wav($aprs);
@@ -81,6 +84,32 @@ sub interval {
 };
 
 # ------------- HELPERS ---------------------
+sub getGPS {
+   my $self    = shift;
+   my $cache   = shift;
+   my $GPS;
+
+   # Get GPS Position from running gpsd
+   my $i = 0;
+   while($i++ < 5){
+      $GPS = eval{ decode_json( $self->sys($gpscmd)) };
+      warn $@ && last if($@);
+   
+      $GPS->{alt}    //=   0;
+      $GPS->{lat_NS} //= 'N';
+      $GPS->{lon_EW} //= 'E';
+                  
+      warn scalar localtime.sprintf(" GPS: %s, %s, %s, %s, %s\n",
+         $GPS->{lat_NS}, $GPS->{lat}, $GPS->{lon_EW}, $GPS->{lon}, $GPS->{alt} )
+            if $DEBUG;
+
+      last if($GPS->{lat} and $GPS->{alt});
+   }
+
+   return $GPS;
+}
+
+
 sub getSensorData {
    my $self    = shift;
 
@@ -126,7 +155,10 @@ sub aprs_build {
 sub aprs_wav {
    my $self    = shift;
    my $aprs    = shift or return;
-   
+
+   my $CallSign= $self->cfg('CallSign'); 
+   my $WavPath = $self->cfg('WavPath');
+
    $self->sys($aprs_bin, "-c $CallSign -o $WavPath \"$aprs\"");
 
    return $WavPath;
@@ -140,7 +172,7 @@ sub aprs_send {
    warn "Send Audio File ..." if($DEBUG);
    
    my $i = 0;
-   while($i++ <= 3){
+   while($i++ < $self->cfg('SendRepeats')){
       $self->sys($aplay, $wavefile);
 
       my $waittime = int(rand(15));
@@ -231,34 +263,22 @@ sub round {
 }
 
 sub getconfig {
-   my ($self) = @_;
+   my ($self, $file) = @_;
    my $return = {};
 
-   my $text = $self->sys("cat $CFGFILE")
-      or die "Unable to find $CFGFILE";
+   my $text = $self->sys("cat $file")
+      or die "Unable to find $file";
+   $text =~ s/\r//sig;
 
-   foreach my $line (split(/\n/)){
+   foreach my $line (split(/\n/, $text)){
       chomp $line;
+      next if($line =~ /^\#/);
+      next if(not $line);
       my ($key, $val) = $line =~ /^(.+?)\s*\:\s*(.+?)$/si;
       $return->{$key} = $val;
    }
    
    return $return;
-}
-
-sub saveconfig {
-   my ($self, $hash) = @_;
-   my $save = '';
-   
-   foreach my $name (%$hash) {
-      $save .= sprintf("%s : %s\n", $name, $hash->{$name});
-   }
-   if($save){
-      open(my $fh, '>', $CFGFILE);
-      print $fh $save;
-      close $fh;
-   }   
-   return $CFGFILE;
 }
 
 1;
