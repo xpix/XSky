@@ -3,15 +3,29 @@ perl controller for a sky payload with raspberry A+
 
 # Features
 * send APRS String over GPIO as Soundmodem afsk
-* add an access point if altitude not changed
+* get sensor data's direct over GPIO
+* try to connect to wifi acces point (iphone tethering) every x minutes when altitude not changed
 * display a webpage with all informations (GPS/Sensors/...)
 * record video via RPI Cam to SD Card
+* start script for reboot or crashes
+* use ssdv for live pictures via LoRa Modules at 433 MHz
+
 
 # Install
-Module:
-* http://search.cpan.org/~mikem/Device-BCM2835-1.8/lib/Device/BCM2835.pm
-* http://search.cpan.org/~srezic/perl-GPS/ (in git)
 
-Packages:
-* sudo apt-get install hostapd dnsmasq (for WLAN AccesPoint)
-* https://menzerath.eu/artikel/raspberry-pi-als-wlan-access-point-nutzen/ (German)
+sudo aptitude install \
+   libjson-xs-perl \
+   gpsd \
+   libdatetime-perl \
+   gpsd-clients \
+   libnet-gpsd3-perl \
+   libanyevent-perl \
+   libanyevent-httpd-perl
+
+# Configure
+* sudo dpkg-reconfigure gpsd
+
+
+# Test
+* call cgps -s
+* check your position on aprs.fi o.a.

@@ -1,0 +1,44 @@
+#!/bin/sh
+# Starts and stops xsky
+# /etc/init.d/xsky
+### BEGIN INIT INFO
+# Provides:     xsky
+# Required-Start:       $syslog
+# Required-Stop:        $syslog
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6
+# Short-Description:    xsky service
+### END INIT INFO
+
+#Load up xsky when called
+case "$1" in
+
+start)
+        cd /home/pi/XSky
+        echo "Starting xsky tracker prg .."
+        sudo -u pi screen -dmS xskyMain ./xsky.pl
+
+        echo "Starting xsky camera record .."
+        cd /home/pi/XSky/video
+        count=`ls -1 /home/pi/XSky/video/*.h264 | wc -l`
+        count=`expr $count + 1`
+        sudo -u pi screen -dmS xskyVideo raspivid --verbose --start "$count" --timeout 28800000 --timed 300000,300000 -fps 10 -w 1296 -h 730 --bitrate 1000000 --output /home/pi/XSky/video/video_%04d.h264 --segment 1200000 --nopreview
+;;
+
+stop)
+        echo "Stopping xskyMain .."
+        sudo -u pi screen -S xskyMain -X quit
+
+        echo "Stopping xskyVideo .."
+        sudo -u pi screen -S xskyVideo -X quit
+;;
+
+restart)
+        echo "Restarting xsky.."
+        $0 stop
+        $0 start
+;;
+*)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac

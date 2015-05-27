@@ -6,7 +6,7 @@ use JSON::XS qw(decode_json);
 
 # ------------- GLOBAL VARS ----------------
 my $SPort    = shift || '/dev/ttyAMA0';
-my $CallSign = shift || 'DH6IAG-11';
+my $CallSign = shift || 'DH6IAG';
 my $WavPath  = '/run/shm/aprs.wav';
 my $aprs_bin = '/usr/local/bin/aprs';
 my $aplay    = '~/XSky/bin/send_aprs';
@@ -90,20 +90,28 @@ sub getSensorData {
 sub aprs_build {
    my $self    = shift;
 
-   # '2015-05-24T17:41:48.000Z'
+   # '2015-05-24T17:41:48.000Z' => 174148
    ($GPS->{'time'}) = $GPS->{'time'} =~ /T(.+?)\./si; # 
    $GPS->{'time'} =~ s/\://sig;
+
+   if($GPS->{alt}){
+      $self->{GSP_ALT} = $GPS->{alt};
+   }
+   else {
+      # Remember to old altitude unable to get actual altitude
+      $GPS->{alt} = $self->{GSP_ALT};
+   }
 
    # Calculate Latitude to degrees
    my ($degrees, $minutes, $seconds, $sign) = $self->decimal2dms($GPS->{lat});
    $GPS->{lat} = sprintf('%02d%02d.%02d', $degrees, $minutes, $seconds);
-warn "Lat: ".$GPS->{lat};
+
    # Calculate Longitude to degrees
    ($degrees, $minutes, $seconds, $sign) = $self->decimal2dms($GPS->{lon});
    $GPS->{lon} = sprintf('%03d%02d.%02d', $degrees, $minutes, $seconds);
-warn "Lon: ".$GPS->{lon};
 
-   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII Balloon',
+   # Build APRS String
+   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII',
             $GPS->{'time'},      # 130515 
             $GPS->{lat},         # 4913.19258
             $GPS->{lat_NS},      # N
@@ -111,7 +119,7 @@ warn "Lon: ".$GPS->{lon};
             $GPS->{lon_EW},      # E
             $GPS->{ept} || 0,    # 054
             $GPS->{speed} || 0,  # 054
-            $GPS->{alt} || 0,    # 054
+            $GPS->{alt} * 3.2808 || 0,    # Alt in ft
          );
 };
 
@@ -130,14 +138,15 @@ sub aprs_send {
    my $nodelete= shift || 0;
    
    warn "Send Audio File ..." if($DEBUG);
+   
+   my $i = 0;
+   while($i++ <= 3){
+      $self->sys($aplay, $wavefile);
 
-   $self->sys($aplay, $wavefile);
-
-   my $waittime = int(rand(15));
-   warn "Wait $waittime seconds and send again." if($DEBUG);
-   sleep($waittime); # wait and send a second time
-
-   $self->sys($aplay, $wavefile);
+      my $waittime = int(rand(15));
+      warn "Wait $waittime seconds and send again." if($DEBUG);
+      sleep($waittime); # wait and send a second time
+   }
 
    unlink($wavefile) if(not $nodelete);
 
@@ -219,6 +228,37 @@ sub decimal2dms {
 sub round {
    my ($self, $wert) = @_;
    return int(10 * $wert + 0.5) / 10;
+}
+
+sub getconfig {
+   my ($self) = @_;
+   my $return = {};
+
+   my $text = $self->sys("cat $CFGFILE")
+      or die "Unable to find $CFGFILE";
+
+   foreach my $line (split(/\n/)){
+      chomp $line;
+      my ($key, $val) = $line =~ /^(.+?)\s*\:\s*(.+?)$/si;
+      $return->{$key} = $val;
+   }
+   
+   return $return;
+}
+
+sub saveconfig {
+   my ($self, $hash) = @_;
+   my $save = '';
+   
+   foreach my $name (%$hash) {
+      $save .= sprintf("%s : %s\n", $name, $hash->{$name});
+   }
+   if($save){
+      open(my $fh, '>', $CFGFILE);
+      print $fh $save;
+      close $fh;
+   }   
+   return $CFGFILE;
 }
 
 1;
