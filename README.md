@@ -28,7 +28,6 @@ This controller will fly in a RPI payload on a helium ballon near to the sky. I'
 
 
 # Install
-
 I use the raspbian image: https://www.raspbian.org/
 To install please call this command line in your _fresh_ raspberry.
 ```
@@ -44,6 +43,9 @@ sudo aptitude install pip python-pyaudio \
 sudo pip install afsk
 sudo dpkg-reconfigure gpsd
 ```
+
+Prepare youre system for Temperature Sensor DS18B20:
+http://www.reuk.co.uk/DS18B20-Temperature-Sensor-with-Raspberry-Pi.htm
 
 # Test
 * call cgps -s
