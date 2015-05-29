@@ -13,6 +13,13 @@ my $aplay    = '~/XSky/bin/send_aprs';
 my $ping     = '/bin/ping';
 my $nice     = '/usr/bin/nice';
 my $gpscmd   = '/usr/bin/gpspipe -w -n 10 | grep --color=never TPV | head -1';
+my $ds18b20  = '~/XSky/bin/ds18b20.sh';
+my $wi_off   = '/usr/sbin/rfkill block wifi';
+my $wi_on    = 'sudo ~/XSky/bin/reconnect.sh';
+my $wifils   = 'sudo iwlist wlan0 scan | grep -i ESSID';
+my $search_ip= 'ifconfig -a wlan0 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}"';
+
+
 my $GPS      = {};
 my $DEBUG    = 0;
 
@@ -23,12 +30,12 @@ sub new {
 
    $self->{cfg} = $self->getconfig(shift);
 
-   $DEBUG = $self->cfg('DEBUG');
+   $DEBUG = shift || $self->cfg('DEBUG') || 0;
    
    return $self;
 }
 
-sub cfg { 
+sub cfg {  
    my $self = shift; 
    my $name = shift or return $self->{cfg};
    return $self->{cfg}->{$name} 
@@ -58,10 +65,6 @@ sub interval {
    else {
       $self->{gpsfail} = 0;
    }
-
-   # Check if altitude change, if not the balloon has landed and 
-   # we try connect to home ssid (Iphone tethering)
-   my $wlanState = $self->checkWlan( $GPS->{alt} );
 
    # Get Temperatures and other Data
    my $sensors = $self->getSensorData();
@@ -113,7 +116,12 @@ sub getGPS {
 sub getSensorData {
    my $self    = shift;
 
-   return {};
+   # DS18B20 Outside Temp sensors
+   my $out_tmp = $self->sys($ds18b20);
+
+   return { 
+      temp_out => $out_tmp, 
+   };
 };
 
 sub aprs_build {
@@ -139,8 +147,11 @@ sub aprs_build {
    ($degrees, $minutes, $seconds, $sign) = $self->decimal2dms($GPS->{lon});
    $GPS->{lon} = sprintf('%03d%02d.%02d', $degrees, $minutes, $seconds);
 
+   # Get additional Informations
+   my $SEN = $self->getSensorData();
+
    # Build APRS String
-   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII',
+   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII;OT:%02.2f',
             $GPS->{'time'},      # 130515 
             $GPS->{lat},         # 4913.19258
             $GPS->{lat_NS},      # N
@@ -149,6 +160,7 @@ sub aprs_build {
             $GPS->{ept} || 0,    # 054
             $GPS->{speed} || 0,  # 054
             $GPS->{alt} * 3.2808 || 0,    # Alt in ft
+            $SEN->{temp_out},
          );
 };
 
@@ -191,41 +203,69 @@ sub aprs_send {
 # we try to connect to an Access Point (Laptop, RPI)
 # http://unix.stackexchange.com/questions/12005/how-to-use-linux-kernel-driver-bind-unbind-interface-for-usb-hid-devices
 # http://raspberrypi.stackexchange.com/questions/6782/commands-to-simulate-removing-and-re-inserting-a-usb-peripheral
-# sudo sh -c 'echo 1-1 > /sys/bus/usb/drivers/usb/unbind'
-# sudo sh -c 'echo 1-1 > /sys/bus/usb/drivers/usb/bind'
 sub checkWlan {
    my $self    = shift;
    my $alt     = shift || return;
+   
+   my $landed = $self->landed($alt);
+   return if($landed < 0); # unknown state do nothing
 
-   # Init wlanState and old altitude
-   $self->{wlan_state} = 0 if(not exists $self->{wlan_state});
-   $self->{old_alt} = 0    if(not exists $self->{old_alt});
-
-   # Altitude not changed?
-   if($self->{old_alt} == $alt){
-      # ping => ok ... return
-      if($self->sys($ping, '-c 1 www.google.de')){
-         return 1;
-      }
-      else {
-         warn "Switch WLAN ON";
-         # Switch USB WLAN ON
-         # Try to connect to an Access Point
-         # wait a minute 
-         # ping
-         # fail => wlan off
-      }
-   }
-   else {
-      warn "Switch WLAN OFF";
-      # Changed Altitude
-      # check if USB WLAN off
-      # if not switch USB Wlan off
+   if($self->landed($alt)){
+      $self->wlan_on;
+   } else {
+      $self->wlan_off;
    }
 
-   $self->{old_alt} = $alt;
-   return $self->{wlan_state};
 };
+
+sub landed {
+   my $self = shift;
+   my $alt  = shift || return;
+
+   my $treshold = $self->cfg->{AltThreshold};
+   my $landed = -1; # unknown
+   
+   if($alt and $self->{alt_old}){
+
+      my $differ = 0;
+      if($alt < $self->{alt_old}){
+         $differ = $self->{alt_old} - $alt;
+      }
+      else{
+         $differ = $alt - $self->{alt_old};
+      }
+
+      if($differ <= $treshold){
+         $landed = 1; # landed 
+      } else {
+         $landed = 0; # flying
+      }
+   }
+
+   $self->{alt_old} = $alt;
+
+   return $landed;
+}
+
+sub wlan_on {
+   my $self    = shift;
+
+   # Check if connected ...
+   if(not $self->sys($search_ip)){
+      # not connected ...
+      warn "Switch WLAN ON";
+      $self->sys($wi_on);
+   }
+   
+   return 1;   
+}
+
+sub wlan_off {
+   my $self    = shift;
+
+   warn "Switch WLAN OFF";
+   $self->sys($wi_off);
+}
 
 # Call system command
 sub sys {
@@ -235,11 +275,14 @@ sub sys {
    
    my $systemcmd = sprintf('%s %s %s 2>&1', $nice, $command, join(' ', @params));
    my $output = `$systemcmd`;
+   chomp $output;
    
    if($? == 0){
       return $output;
    }
-   warn sprintf('Call return wrong exit status %d: %s for cmd "%s"', $?, $output, $systemcmd);
+   warn sprintf('Call return wrong exit status %d: %s for cmd "%s"', $?, $output, $systemcmd)
+      if($DEBUG);
+   return 0;
 };
 
 sub decimal2dms {
@@ -264,6 +307,7 @@ sub round {
 
 sub getconfig {
    my ($self, $file) = @_;
+   die "No file in getConfig" unless $file;
    my $return = {};
 
    my $text = $self->sys("cat $file")

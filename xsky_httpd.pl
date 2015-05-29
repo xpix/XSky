@@ -30,7 +30,13 @@ my $aprs_timer = AnyEvent->timer (
    after    => 0, 
    interval => 60, 
    cb => sub { 
-      $data = $xsky->data();
+      $data = $xsky->data();                 # GPS Data
+      $data->{cfg} = $xsky->cfg;             # Configuration data
+      $data->{sen} = $xsky->getSensorData;   # Sensor data
+
+      # Check if altitude change, if not the balloon has landed and 
+      # we try connect to home ssid (Iphone tethering)
+      my $wlanState = $xsky->checkWlan( $data->{gps}->{'alt'} );
    });
 
 # ------------- Simple Webserver -----

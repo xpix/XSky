@@ -10,10 +10,14 @@ use XSKY;
 my $cfgfile = shift 
    or die "Please call $0 path_to_configfile!";
 
-my $xsky    = XSKY->new($cfgfile);
+my $DEBUG = shift || 0;
+
+my $xsky    = XSKY->new($cfgfile, $DEBUG);
 my $convar  = AnyEvent->condvar;
 
 my $interval = $xsky->cfg('Interval') || 300; # intervall in seconds
+
+unlink $xsky->cfg('WavPath');
 
 printf "
    Main Program ... 
@@ -26,7 +30,7 @@ printf "
 # ------------- Main Loop ------------
 # Timer to send aprs every x minutes
 my $aprs_timer = AnyEvent->timer (
-   after    => 60, 
+   after    => ($DEBUG ? 0 : 60), 
    interval => $interval, 
    cb => sub { 
       $xsky->interval();
