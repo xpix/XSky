@@ -43,8 +43,9 @@ my $aprs_timer = AnyEvent->timer (
 $httpd->reg_cb (
    '' => sub {
       my ($httpd, $req) = @_;
-      my $html = `cat templates/index.html`;
+      my $html = $xsky->sys('cat ~/XSky/templates/index.html');
       $html = eval 'return qq#'.$html.'#;'; # interpolate from data
+      warn $@ if $@;
       $req->respond ({ content => ['text/html', $html]});
    }
 );

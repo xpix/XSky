@@ -5,7 +5,7 @@ if ($? == 0)
    if ($sensor_temp !~ /NO/)
    {
       $sensor_temp =~ /t=(\d+)/i;
-      $tempreature = (($1/1000)-6); # My sensor seems to read about 6 degrees high, so quick fudge to fix value
+      $tempreature = ($1/1000); # My sensor seems to read about 6 degrees high, so quick fudge to fix value
 
       print "$tempreature\n";
       exit;
