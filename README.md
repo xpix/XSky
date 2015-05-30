@@ -31,7 +31,7 @@ This controller will fly in a RPI payload on a helium ballon near to the sky. I'
 I use the raspbian image: https://www.raspbian.org/
 To install please call this command line in your _fresh_ raspberry.
 ```
-sudo aptitude install pip python-pyaudio \
+sudo apt-get install python-pip python-pyaudio python-smbus \
    libjson-xs-perl \
    gpsd \
    libdatetime-perl \

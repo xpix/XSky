@@ -10,7 +10,7 @@ use JSON::XS qw(decode_json);
 # ------------- GLOBAL VARS ----------------
 # --- our commands
 my $aplay    = '~/XSky/bin/send_aprs';
-my $ds18b20  = '~/XSky/bin/ds18b20.sh';
+my $ds18b20  = '~/XSky/bin/ds18b20.pl';
 my $bmp180   = '~/XSky/bin/bmp180.py';
 my $wi_on    = 'sudo ~/XSky/bin/reconnect.sh';
 
