@@ -14,6 +14,9 @@
 <body>
   <div class="container bs-docs-container">
      <h1><a href="/">XSky</a> State</h1>
+
+      $block_warning
+
       <table class="table table-condensed">
        <tbody>
          <tr>
@@ -33,6 +36,12 @@
            <td>$data->{gps}->{'speed'} m/s</td>
            <td>Temperature Outside</td>
            <td>$data->{sen}->{'temp_out'}°C</td>
+         </tr>
+         <tr>
+           <td>Air Pressure</td>
+           <td>$data->{gps}->{'pressure'} hPa</td>
+           <td>Temperature Inside</td>
+           <td>$data->{sen}->{'temp_in'}°C</td>
          </tr>
        </tbody>
      </table>

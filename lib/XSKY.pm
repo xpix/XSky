@@ -8,16 +8,20 @@ use warnings;
 use JSON::XS qw(decode_json);
 
 # ------------- GLOBAL VARS ----------------
-my $aprs_bin = '/usr/local/bin/aprs';
+# --- our commands
 my $aplay    = '~/XSky/bin/send_aprs';
+my $ds18b20  = '~/XSky/bin/ds18b20.sh';
+my $bmp180   = '~/XSky/bin/bmp180.py';
+my $wi_on    = 'sudo ~/XSky/bin/reconnect.sh';
+
+# --- system commands
 my $ping     = '/bin/ping';
+my $aprs_bin = '/usr/local/bin/aprs';
 my $nice     = '/usr/bin/nice';
 my $gpscmd   = '/usr/bin/gpspipe -w -n 10 | grep --color=never TPV | head -1';
-my $ds18b20  = '~/XSky/bin/ds18b20.sh';
 my $wi_off   = '/usr/sbin/rfkill block wifi';
-my $wi_on    = 'sudo ~/XSky/bin/reconnect.sh';
-my $wifils   = 'sudo iwlist wlan0 scan | grep -i ESSID';
-my $search_ip= 'ifconfig -a wlan0 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}"';
+my $wifils   = 'sudo /sbin/iwlist wlan0 scan | grep -i ESSID';
+my $search_ip= '/sbin/ifconfig -a wlan0 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}"';
 
 
 my $GPS      = {};
@@ -119,8 +123,13 @@ sub getSensorData {
    # DS18B20 Outside Temp sensors
    my $out_tmp = $self->sys($ds18b20);
 
+   # BMP180 Pressure and inside Temp
+   my ($in_tmp, $pressure) = split(/\s+/, $self->sys($bmp180));
+   
    return { 
       temp_out => $out_tmp, 
+      temp_in  => $in_tmp,
+      pressure => $pressure,
    };
 };
 
@@ -151,7 +160,7 @@ sub aprs_build {
    my $SEN = $self->getSensorData();
 
    # Build APRS String
-   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII;OT:%02.2f',
+   return sprintf('/%sh%s%s/%s%sO%03d/%03d/A=%06d/FSHABIII;OT%02.2fIT%02.2fPR%.2f',
             $GPS->{'time'},      # 130515 
             $GPS->{lat},         # 4913.19258
             $GPS->{lat_NS},      # N
@@ -160,7 +169,9 @@ sub aprs_build {
             $GPS->{ept} || 0,    # 054
             $GPS->{speed} || 0,  # 054
             $GPS->{alt} * 3.2808 || 0,    # Alt in ft
-            $SEN->{temp_out},
+            $SEN->{temp_out},    # in celsius
+            $SEN->{temp_in},     # --"--
+            $SEN->{pressure},    # in hecto Pascal hPa
          );
 };
 
