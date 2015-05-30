@@ -3,6 +3,13 @@ Controller written in perl for a sky payload with raspberry A+.
 
 This controller will fly in a RPI payload on a helium ballon near to the sky. I'll use a raspberry A+ because to save (a lot) of Energy. I'll use a SD-Card with 32GByte to save the recorded videos (segements a x minutes). The Idea, at the ground the controller recognize that the altitude soesnt change. In this case he try to find a WIFI (Users Phone Tethering Wlan), the user run around at the last send position and the payload connect automaticly. Now he can download all videos or check the website to get his position.
 
+# Image
+* Minibian : https://minibianpi.wordpress.com/
+
+Please configure Ethernet and wlan, also resize your root fs. All what you need are descrie here: 
+* https://minibianpi.wordpress.com/faq/
+* https://www.raspberrypi.org/documentation/configuration/wireless/wireless-cli.md
+
 # Hardware
 (thats only examples and my personal setup)
 * Raspberry PI A+: https://www.raspberrypi.org/products/model-a-plus/
