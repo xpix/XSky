@@ -33,23 +33,41 @@ Please configure Ethernet and wlan, also resize your root fs. All what you need 
 * start script for reboot or crashes
 * use ssdv for live pictures via LoRa Modules at 433 MHz
 
-
 # Install
 I use the raspbian image: https://www.raspbian.org/
 To install please call this command line in your _fresh_ raspberry.
 ```
-sudo apt-get install python-pip python-pyaudio python-smbus \
+sudo apt-get install python-pip python-pyaudio python-smbus python-bitarray \
    libjson-xs-perl \
+   alsa-utils \
    gpsd \
    libdatetime-perl \
    gpsd-clients \
    libnet-gpsd3-perl \
+   liburi-perl \
    libanyevent-perl \
    libanyevent-httpd-perl
    
 sudo pip install afsk
 sudo dpkg-reconfigure gpsd
+
+adduser pi i2c
 ```
+
+Wiring Pi
+
+Next, install the excellent "Wiring Pi” software from Gordon Henderson. This provides a command-line app “gpio” 
+which we can use to test the PITS board, plus some C libraries which the PITS software uses to access the 
+GPIO Hardware. 
+
+Install using these commands:
+```
+cd ~
+git clone git://git.drogon.net/wiringPi
+cd wiringPi
+./build
+```
+
 
 Prepare youre system for Temperature Sensor DS18B20:
 http://www.reuk.co.uk/DS18B20-Temperature-Sensor-with-Raspberry-Pi.htm
