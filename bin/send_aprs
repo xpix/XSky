@@ -1,16 +1,16 @@
 #!/bin/bash
 
 WAVEFILE=$1
-if [ -e "$WAVEFILE" ]
+if [ ! -e "$WAVEFILE" ]
   then
     echo "No path to wav file supplied"
 fi
 
 cd ~/XSky
 echo Redirect audio to GPIO ...
-sudo nice ./bin/pwm_switch
+sudo ./bin/pwm_switch
 echo Set volume
-nice amixer set PCM -- 100
+sudo amixer set PCM -- 100
 
 echo Set PTT ...
 
@@ -22,9 +22,7 @@ if [ -e $WAVEFILE ]
 then
 	echo Found file ...
 	gpio write 4 0
-	sleep 0.2
-	nice aplay $WAVEFILE
-	sleep 0.2
+	nice sudo aplay $WAVEFILE
 	gpio write 4 1
 fi
 sleep 1

@@ -30,7 +30,14 @@ my $aprs_timer = AnyEvent->timer (
    after    => 0, 
    interval => 60, 
    cb => sub { 
-      $data = $xsky->data();                 # GPS Data
+      my $tmp = $xsky->data();                 # get GPS Data
+      if($tmp->{gps}->{'lat'}){
+         $data->{'gps'}->{old} = '';
+         $data = $tmp; # use only good data
+      }else{
+         $data->{'gps'}->{old} = scalar localtime          # mark data as old data
+            if(not exists $data->{'gps'}->{old});
+      }
       $data->{cfg} = $xsky->cfg;             # Configuration data
       $data->{sen} = $xsky->getSensorData;   # Sensor data
 
@@ -43,9 +50,13 @@ my $aprs_timer = AnyEvent->timer (
 $httpd->reg_cb (
    '' => sub {
       my ($httpd, $req) = @_;
-      my $html = $xsky->sys('cat ~/XSky/templates/index.html');
+      my $html = `cat templates/index.html`;
+      
+      my $block_warning = '';
+      $block_warning = qq|<div class="alert alert-warning" role="alert">Bad GPS Signal. Last good data: $data->{gps}->{'old'}</div>|
+         if($data->{gps}->{'old'});
+
       $html = eval 'return qq#'.$html.'#;'; # interpolate from data
-      warn $@ if $@;
       $req->respond ({ content => ['text/html', $html]});
    }
 );

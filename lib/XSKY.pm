@@ -9,7 +9,7 @@ use JSON::XS qw(decode_json);
 
 # ------------- GLOBAL VARS ----------------
 # --- our commands
-my $aplay    = '~/XSky/bin/send_aprs';
+my $aplay    = 'sudo ~/XSky/bin/send_aprs';
 my $ds18b20  = '~/XSky/bin/ds18b20.pl';
 my $bmp180   = '~/XSky/bin/bmp180.py';
 my $wi_on    = 'sudo ~/XSky/bin/reconnect.sh';
@@ -198,7 +198,7 @@ sub aprs_send {
    while($i++ < $self->cfg('SendRepeats')){
       $self->sys($aplay, $wavefile);
 
-      my $waittime = int(rand(15));
+      my $waittime = int(rand($self->cfg('RandRepeats')));
       warn "Wait $waittime seconds and send again." if($DEBUG);
       sleep($waittime); # wait and send a second time
    }

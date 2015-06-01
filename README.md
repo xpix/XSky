@@ -39,6 +39,7 @@ To install please call this command line in your _fresh_ raspberry.
 ```
 sudo apt-get install python-pip python-pyaudio python-smbus python-bitarray \
    libjson-xs-perl \
+   screen \
    alsa-utils \
    gpsd \
    libdatetime-perl \
